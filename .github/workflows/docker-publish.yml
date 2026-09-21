@@ -38,11 +38,55 @@ jobs:
           TAG="${{ steps.version.outputs.tag }}"
           if gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
-            echo "Release $TAG already exists — skipping create"
+            echo "Release $TAG already exists"
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
             echo "Release $TAG does not exist yet"
           fi
+
+      - name: Build release notes from CHANGELOG
+        id: notes
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          import os
+
+          version = os.environ["VERSION"]
+          lines = Path("CHANGELOG.md").read_text(encoding="utf-8").splitlines()
+
+          start = next(
+              (i for i, line in enumerate(lines) if line.startswith(f"## [{version}]")),
+              None,
+          )
+          if start is None:
+              section = f"## [{version}]\n\n_No CHANGELOG section found for this version._\n"
+          else:
+              end = len(lines)
+              for j in range(start + 1, len(lines)):
+                  line = lines[j]
+                  if line.startswith("## ["):
+                      end = j
+                      break
+                  # Keep a Changelog link footer: [0.2.0]: https://...
+                  if line.startswith("[") and "]:" in line and not line.startswith("[Unreleased]"):
+                      # only treat as footer when it looks like a version link line
+                      label = line[1 : line.index("]")]
+                      if label == "Unreleased" or label[0].isdigit():
+                          end = j
+                          break
+              section = "\n".join(lines[start:end]).strip() + "\n"
+
+          image = f"ghcr.io/tuner88/teslamate-supercharger-cost-estimator:{version}"
+          body = (
+              f"{section}\n"
+              f"---\n\n"
+              f"**Docker image:** `{image}`\n"
+          )
+          Path("release-body.md").write_text(body, encoding="utf-8")
+          print(body)
+          PY
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -83,7 +127,7 @@ jobs:
 
       # On main: when pyproject version has no GitHub Release yet, create tag vX.Y.Z + release.
       # On tag push: create the release if it is still missing (manual tags).
-      # Attach the Compose snippet so the Downloads badge has a countable release asset.
+      # Body is the matching CHANGELOG section (Added/Changed/…), not just a link.
       - name: Create GitHub Release
         if: >-
           (github.ref == 'refs/heads/main' && steps.release_check.outputs.exists == 'false')
@@ -93,10 +137,19 @@ jobs:
           tag_name: ${{ steps.version.outputs.tag }}
           name: ${{ steps.version.outputs.tag }}
           target_commitish: ${{ github.sha }}
+          body_path: release-body.md
           generate_release_notes: true
           files: |
             deploy/docker-compose.snippet.yml
-          body: |
-            Docker image: `ghcr.io/tuner88/teslamate-supercharger-cost-estimator:${{ steps.version.outputs.version }}`
 
-            See [CHANGELOG.md](https://github.com/TUNER88/teslamate-supercharger-cost-estimator/blob/main/CHANGELOG.md) for details.
+      # Keep an existing release's notes in sync with CHANGELOG (e.g. first publish after this fix).
+      - name: Refresh existing release notes from CHANGELOG
+        if: >-
+          github.ref == 'refs/heads/main'
+          && steps.release_check.outputs.exists == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release edit "${{ steps.version.outputs.tag }}" \
+            --repo "${{ github.repository }}" \
+            --notes-file release-body.md
