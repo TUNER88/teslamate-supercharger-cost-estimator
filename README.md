@@ -1,12 +1,17 @@
 # TeslaMate Supercharger Cost Estimator
 
+[![CI](https://github.com/TUNER88/teslamate-supercharger-cost-estimator/actions/workflows/ci.yml/badge.svg)](https://github.com/TUNER88/teslamate-supercharger-cost-estimator/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/TUNER88/teslamate-supercharger-cost-estimator)](https://github.com/TUNER88/teslamate-supercharger-cost-estimator/releases/latest)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
+
 Estimate Supercharger session costs in [TeslaMate](https://github.com/teslamate-org/teslamate) from **public** published rates — **no Tesla account login**.
 
 **Covers every car on your TeslaMate instance**, not only vehicles you own. Shared and fleet cars get the same estimates as long as their Supercharging sessions are logged in TeslaMate. Invoice importers usually cannot do that, because they need access to that account’s Tesla invoices.
 
 Rates come from [SuC Tracker](https://suc-tracker.eu/) (`/data/europe.json`). The tool matches finished charging sessions to nearby Superchargers and writes an estimated total into `charging_processes.cost`.
 
-Current version: **0.2.0** (see [CHANGELOG.md](CHANGELOG.md)).
+See [CHANGELOG.md](CHANGELOG.md) for release history.
 
 ## Estimate vs billed cost
 
