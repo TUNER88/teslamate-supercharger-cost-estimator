@@ -70,12 +70,12 @@ Paste this under `services:` (same file as your `database` service). Full copy a
       - database
     environment:
       - DATABASE_PASS=${DATABASE_PASS}
-      - UPDATE_INTERVAL_SECONDS=300
+      - UPDATE_INTERVAL_SECONDS=3600
     volumes:
       - ./suc-estimator-cache:/cache
 ```
 
-Only `DATABASE_PASS` is required (same Postgres password as TeslaMate). With `UPDATE_INTERVAL_SECONDS=300` and `restart: always`, the container stays up and re-scans about every 5 minutes (same idea as TeslaMateAgile). Other settings use built-in defaults (see [Environment variables](#environment-variables)).
+Only `DATABASE_PASS` is required (same Postgres password as TeslaMate). With `UPDATE_INTERVAL_SECONDS=3600` and `restart: always`, the container stays up and re-scans about once an hour (enough for Supercharger public rates; use a lower value only if you want costs in Grafana sooner). Other settings use built-in defaults (see [Environment variables](#environment-variables)).
 
 ### 2. Start it
 
@@ -134,7 +134,7 @@ docker compose up -d suc-estimator
 | `OVERWRITE_EXISTING` | No | `false` | Also rewrite non-null costs |
 | `ALLOW_CROSS_TOU` | No | `false` | If `true`, estimate sessions that cross a time-of-use (TOU) rate change using the **start-time** rate (skipped by default) |
 | `DRY_RUN` | No | `false` | If `true`, log estimates without writing to the database |
-| `UPDATE_INTERVAL_SECONDS` | No | `0` | If `> 0`, keep running and re-scan on this interval (Agile-style). `0` = run once and exit |
+| `UPDATE_INTERVAL_SECONDS` | No | `0` | If `> 0`, keep running and re-scan on this interval (Agile-style). Compose example uses `3600`. `0` = run once and exit |
 | `CACHE_DIR` | No | `/cache` | Directory for the rates cache |
 | `CACHE_TTL_SECONDS` | No | `43200` | Rate cache lifetime (12 hours) |
 

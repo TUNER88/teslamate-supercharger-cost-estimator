@@ -15,6 +15,6 @@
       - database
     environment:
       - DATABASE_PASS=${DATABASE_PASS}
-      - UPDATE_INTERVAL_SECONDS=300
+      - UPDATE_INTERVAL_SECONDS=3600
     volumes:
       - ./suc-estimator-cache:/cache
