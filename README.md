@@ -70,12 +70,11 @@ Paste this under `services:` (same file as your `database` service). Full copy a
       - database
     environment:
       - DATABASE_PASS=${DATABASE_PASS}
-      - UPDATE_INTERVAL_SECONDS=3600
     volumes:
       - ./suc-estimator-cache:/cache
 ```
 
-Only `DATABASE_PASS` is required (same Postgres password as TeslaMate). With `UPDATE_INTERVAL_SECONDS=3600` and `restart: always`, the container stays up and re-scans about once an hour (enough for Supercharger public rates; use a lower value only if you want costs in Grafana sooner). Other settings use built-in defaults (see [Environment variables](#environment-variables)).
+Only `DATABASE_PASS` is required (same Postgres password as TeslaMate). By default the process loops every **3600** seconds (`UPDATE_INTERVAL_SECONDS`). With `restart: always`, the container stays up and keeps filling new Supercharger costs. Other settings use built-in defaults (see [Environment variables](#environment-variables)).
 
 ### 2. Start it
 
@@ -99,10 +98,10 @@ docker compose run --rm -e UPDATE_INTERVAL_SECONDS=0 suc-estimator --version
 
 ### 3. One-shot / cron (optional)
 
-If you prefer cron instead of a long-running container, set `UPDATE_INTERVAL_SECONDS=0` (or omit it) and `restart: "no"`, then:
+If you prefer cron instead of a long-running container, set `UPDATE_INTERVAL_SECONDS=0` and `restart: "no"`, then:
 
 ```cron
-0 6,18 * * * cd /path/to/teslamate && docker compose run --rm suc-estimator
+0 6,18 * * * cd /path/to/teslamate && docker compose run --rm -e UPDATE_INTERVAL_SECONDS=0 suc-estimator
 ```
 
 ### Build from source (optional)
@@ -134,7 +133,7 @@ docker compose up -d suc-estimator
 | `OVERWRITE_EXISTING` | No | `false` | Also rewrite non-null costs |
 | `ALLOW_CROSS_TOU` | No | `false` | If `true`, estimate sessions that cross a time-of-use (TOU) rate change using the **start-time** rate (skipped by default) |
 | `DRY_RUN` | No | `false` | If `true`, log estimates without writing to the database |
-| `UPDATE_INTERVAL_SECONDS` | No | `0` | If `> 0`, keep running and re-scan on this interval (Agile-style). Compose example uses `3600`. `0` = run once and exit |
+| `UPDATE_INTERVAL_SECONDS` | No | `3600` | Seconds between scans in loop mode. `0` = run once and exit |
 | `CACHE_DIR` | No | `/cache` | Directory for the rates cache |
 | `CACHE_TTL_SECONDS` | No | `43200` | Rate cache lifetime (12 hours) |
 

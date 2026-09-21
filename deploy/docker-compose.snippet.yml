@@ -1,7 +1,7 @@
 # Paste under services: in your TeslaMate docker-compose.yml
 # Image: ghcr.io/tuner88/teslamate-supercharger-cost-estimator:0.3.0
 #
-# Only DATABASE_PASS is required; see README for the full env table.
+# Only DATABASE_PASS is required; UPDATE_INTERVAL_SECONDS defaults to 3600.
 # mkdir -p suc-estimator-cache
 # docker compose pull suc-estimator
 # docker compose up -d suc-estimator
@@ -15,6 +15,5 @@
       - database
     environment:
       - DATABASE_PASS=${DATABASE_PASS}
-      - UPDATE_INTERVAL_SECONDS=3600
     volumes:
       - ./suc-estimator-cache:/cache
