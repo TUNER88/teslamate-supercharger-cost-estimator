@@ -83,6 +83,7 @@ jobs:
 
       # On main: when pyproject version has no GitHub Release yet, create tag vX.Y.Z + release.
       # On tag push: create the release if it is still missing (manual tags).
+      # Attach the Compose snippet so the Downloads badge has a countable release asset.
       - name: Create GitHub Release
         if: >-
           (github.ref == 'refs/heads/main' && steps.release_check.outputs.exists == 'false')
@@ -93,6 +94,8 @@ jobs:
           name: ${{ steps.version.outputs.tag }}
           target_commitish: ${{ github.sha }}
           generate_release_notes: true
+          files: |
+            deploy/docker-compose.snippet.yml
           body: |
             Docker image: `ghcr.io/tuner88/teslamate-supercharger-cost-estimator:${{ steps.version.outputs.version }}`
 
