@@ -10,7 +10,7 @@ from argparse import Namespace
 
 from suc_estimator import __version__
 from suc_estimator.db import connect, fetch_sessions, update_cost
-from suc_estimator.estimator import estimate_session
+from suc_estimator.estimator import estimate_session, looks_like_supercharger
 from suc_estimator.pricesource import DEFAULT_URL, fetch_prices
 from suc_estimator.pricing import load_stations
 
@@ -99,6 +99,8 @@ def run_once(args: Namespace, *, host: str, port: int, name: str, user: str, pas
         log.info("Candidate sessions: %d", len(sessions))
 
         ok = unmatched = skipped = written = 0
+        per_car: dict[int, tuple[int, float]] = {}
+        coverage_gap: list[tuple[int, str]] = []
         for session in sessions:
             result = estimate_session(
                 session,
@@ -119,12 +121,28 @@ def run_once(args: Namespace, *, host: str, port: int, name: str, user: str, pas
                     update_cost(conn, result.session_id, result.cost)
                     written += 1
                     log.info("Updated %s", msg)
+                if session.car_id is not None:
+                    count, total = per_car.get(session.car_id, (0, 0.0))
+                    per_car[session.car_id] = (count + 1, total + (result.cost or 0.0))
             elif result.status == "unmatched":
                 unmatched += 1
                 log.debug("unmatched id=%s %s", result.session_id, result.detail)
+                if looks_like_supercharger(session):
+                    geofence_name = session.geofence_name or f"id={session.geofence_id}"
+                    coverage_gap.append((result.session_id, geofence_name))
             else:
                 skipped += 1
                 log.debug("skip id=%s %s", result.session_id, result.detail)
+
+        if coverage_gap:
+            names = ", ".join(dict.fromkeys(name for _, name in coverage_gap))
+            log.warning(
+                "%d unmatched session(s) at a Supercharger-named geofence (%s) — "
+                "no priced station within %.0f m; missing from the feed?",
+                len(coverage_gap),
+                names,
+                args.match_radius_m,
+            )
 
         if not args.dry_run:
             conn.commit()
@@ -137,6 +155,8 @@ def run_once(args: Namespace, *, host: str, port: int, name: str, user: str, pas
             skipped,
             args.dry_run,
         )
+        for car_id, (count, total) in sorted(per_car.items()):
+            log.info("car_id=%d: %d session(s), %.2f total cost", car_id, count, total)
     return 0
 
 
