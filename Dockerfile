@@ -10,4 +10,5 @@ ENV CACHE_DIR=/cache \
 VOLUME ["/cache"]
 
 ENTRYPOINT ["suc-estimator"]
-CMD ["--dry-run"]
+# No default args: a plain `docker compose run` writes costs.
+# Pass --dry-run explicitly when you only want a preview.
