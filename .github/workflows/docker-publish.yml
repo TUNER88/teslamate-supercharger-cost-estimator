@@ -27,7 +27,22 @@ jobs:
           VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "major_minor=${VERSION%.*}" >> "$GITHUB_OUTPUT"
+          echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
           echo "Package version ${VERSION}"
+
+      - name: Check if this version is already released
+        id: release_check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          if gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Release $TAG already exists — skipping create"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "Release $TAG does not exist yet"
+          fi
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -66,8 +81,19 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      # On main: when pyproject version has no GitHub Release yet, create tag vX.Y.Z + release.
+      # On tag push: create the release if it is still missing (manual tags).
       - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: >-
+          (github.ref == 'refs/heads/main' && steps.release_check.outputs.exists == 'false')
+          || (startsWith(github.ref, 'refs/tags/v') && steps.release_check.outputs.exists == 'false')
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }}
+          target_commitish: ${{ github.sha }}
           generate_release_notes: true
+          body: |
+            Docker image: `ghcr.io/tuner88/teslamate-supercharger-cost-estimator:${{ steps.version.outputs.version }}`
+
+            See [CHANGELOG.md](https://github.com/TUNER88/teslamate-supercharger-cost-estimator/blob/main/CHANGELOG.md) for details.
