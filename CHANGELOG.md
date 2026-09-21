@@ -7,6 +7,10 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Added
+
+- README project preview image (`docs/assets/social-preview.svg`) for discoverability
+
 ## [0.3.0] - 2026-09-21
 
 ### Added
