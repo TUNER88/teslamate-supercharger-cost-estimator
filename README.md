@@ -41,8 +41,6 @@ If the first pull fails with `unauthorized`, open the package on GitHub → **Pa
 
 ### 1. Add the service to your TeslaMate Compose file
 
-Create a cache folder next to your compose file:
-
 ```bash
 mkdir -p suc-estimator-cache
 ```
@@ -57,25 +55,12 @@ Paste this under `services:` (same file as your `database` service). Full copy a
     depends_on:
       - database
     environment:
-      - DATABASE_HOST=database
-      - DATABASE_PORT=5432
-      - DATABASE_NAME=teslamate
-      - DATABASE_USER=teslamate
       - DATABASE_PASS=${DATABASE_PASS}
-      - PRICE_SOURCE_URL=https://suc-tracker.eu/data/europe.json
-      - CACHE_DIR=/cache
-      - CACHE_TTL_SECONDS=43200
-      - PRICING_FAMILY=tesla
-      - MATCH_RADIUS_M=400
-      - LOOKBACK_DAYS=90
-      - OVERWRITE_EXISTING=false
-      - ALLOW_CROSS_TOU=false
-      - TZ=Europe/Berlin
     volumes:
       - ./suc-estimator-cache:/cache
 ```
 
-Set `DATABASE_PASS` to the same Postgres password TeslaMate uses.
+Only `DATABASE_PASS` is required (same Postgres password as TeslaMate). Other settings use built-in defaults (see [Environment variables](#environment-variables)).
 
 ### 2. Pull and run
 
@@ -108,18 +93,23 @@ docker compose build suc-estimator
 docker compose run --rm suc-estimator --dry-run
 ```
 
-## Configuration
+## Environment variables
 
-| Variable | Default | Meaning |
-|----------|---------|---------|
-| `DATABASE_*` | TeslaMate defaults | Postgres connection |
-| `PRICE_SOURCE_URL` | SuC Tracker Europe JSON | Public rates URL |
-| `PRICING_FAMILY` | `tesla` | `tesla` or `nonTesla` |
-| `MATCH_RADIUS_M` | `400` | Max metres to match a station |
-| `LOOKBACK_DAYS` | `90` | How far back to scan |
-| `OVERWRITE_EXISTING` | `false` | Also rewrite non-null costs |
-| `ALLOW_CROSS_TOU` | `false` | If true, estimate sessions that cross a TOU rate change using the **start-time** rate (skipped by default) |
-| `CACHE_TTL_SECONDS` | `43200` | Rate cache lifetime |
+| Variable | Required | Default | Meaning |
+|----------|----------|---------|---------|
+| `DATABASE_PASS` | **Yes** | — | Postgres password (`DATABASE_PASSWORD` also accepted) |
+| `DATABASE_HOST` | No | `database` | Postgres host (Compose service name) |
+| `DATABASE_PORT` | No | `5432` | Postgres port |
+| `DATABASE_NAME` | No | `teslamate` | Database name |
+| `DATABASE_USER` | No | `teslamate` | Database user |
+| `PRICE_SOURCE_URL` | No | `https://suc-tracker.eu/data/europe.json` | Public rates URL |
+| `PRICING_FAMILY` | No | `tesla` | `tesla` or `nonTesla` |
+| `MATCH_RADIUS_M` | No | `400` | Max metres to match a station |
+| `LOOKBACK_DAYS` | No | `90` | How far back to scan |
+| `OVERWRITE_EXISTING` | No | `false` | Also rewrite non-null costs |
+| `ALLOW_CROSS_TOU` | No | `false` | If `true`, estimate sessions that cross a TOU rate change using the **start-time** rate (skipped by default) |
+| `CACHE_DIR` | No | `/cache` | Directory for the rates cache |
+| `CACHE_TTL_SECONDS` | No | `43200` | Rate cache lifetime (12 hours) |
 
 CLI flags mirror these (`--dry-run`, `--lookback-days`, `--match-radius-m`, `--overwrite`, `--allow-cross-tou`, …).
 

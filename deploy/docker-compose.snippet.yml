@@ -1,6 +1,7 @@
 # Paste under services: in your TeslaMate docker-compose.yml
 # Image: ghcr.io/tuner88/teslamate-supercharger-cost-estimator:latest
 #
+# Only DATABASE_PASS is required; see README for the full env table.
 # mkdir -p suc-estimator-cache
 # docker compose pull suc-estimator
 # Dry-run:  docker compose run --rm suc-estimator --dry-run
@@ -14,19 +15,6 @@
     depends_on:
       - database
     environment:
-      - DATABASE_HOST=database
-      - DATABASE_PORT=5432
-      - DATABASE_NAME=teslamate
-      - DATABASE_USER=teslamate
       - DATABASE_PASS=${DATABASE_PASS}
-      - PRICE_SOURCE_URL=https://suc-tracker.eu/data/europe.json
-      - CACHE_DIR=/cache
-      - CACHE_TTL_SECONDS=43200
-      - PRICING_FAMILY=tesla
-      - MATCH_RADIUS_M=400
-      - LOOKBACK_DAYS=90
-      - OVERWRITE_EXISTING=false
-      - ALLOW_CROSS_TOU=false
-      - TZ=Europe/Berlin
     volumes:
       - ./suc-estimator-cache:/cache
