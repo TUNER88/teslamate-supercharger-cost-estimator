@@ -22,18 +22,30 @@ def _env(name: str, default: str | None = None) -> str | None:
     return v
 
 
+def _env_bool(name: str, default: bool = False) -> bool:
+    raw = _env(name)
+    if raw is None:
+        return default
+    return raw.lower() in {"1", "true", "yes"}
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="suc-estimator",
         description="Estimate TeslaMate Supercharger costs from public rates (no Tesla account).",
     )
-    p.add_argument("--dry-run", action="store_true", help="Do not write to the database")
+    p.add_argument(
+        "--dry-run",
+        action="store_true",
+        default=_env_bool("DRY_RUN", False),
+        help="Do not write to the database (also DRY_RUN=true; default is write)",
+    )
     p.add_argument("--lookback-days", type=int, default=int(_env("LOOKBACK_DAYS", "90") or 90))
     p.add_argument("--match-radius-m", type=float, default=float(_env("MATCH_RADIUS_M", "400") or 400))
     p.add_argument(
         "--overwrite",
         action="store_true",
-        default=(_env("OVERWRITE_EXISTING", "false") or "false").lower() in {"1", "true", "yes"},
+        default=_env_bool("OVERWRITE_EXISTING", False),
         help="Also update sessions that already have a cost",
     )
     p.add_argument(
@@ -47,7 +59,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--allow-cross-tou",
         action="store_true",
-        default=(_env("ALLOW_CROSS_TOU", "false") or "false").lower() in {"1", "true", "yes"},
+        default=_env_bool("ALLOW_CROSS_TOU", False),
         help="Estimate sessions that cross a time-of-use rate change using the start-time rate (skipped by default)",
     )
     p.add_argument("-v", "--verbose", action="store_true")

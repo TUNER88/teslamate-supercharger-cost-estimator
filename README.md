@@ -60,17 +60,17 @@ Paste this under `services:` (same file as your `database` service). Full copy a
       - ./suc-estimator-cache:/cache
 ```
 
-Only `DATABASE_PASS` is required (same Postgres password as TeslaMate). Other settings use built-in defaults (see [Environment variables](#environment-variables)).
+Only `DATABASE_PASS` is required (same Postgres password as TeslaMate). Other settings use built-in defaults (see [Environment variables](#environment-variables)). A normal run **writes** costs; use `DRY_RUN=true` or `--dry-run` for a preview.
 
 ### 2. Pull and run
 
 ```bash
 docker compose pull suc-estimator
-docker compose run --rm suc-estimator --dry-run
+docker compose run --rm -e DRY_RUN=true suc-estimator
 docker compose run --rm suc-estimator
 ```
 
-`--dry-run` logs what would be written without changing the database. A normal run fills `charging_processes.cost` where it is still null (for every car in that TeslaMate DB).
+The first command previews without writing. The second fills `charging_processes.cost` where it is still null (for every car in that TeslaMate DB).
 
 ### 3. Schedule (optional)
 
@@ -90,7 +90,8 @@ In the Compose service, replace `image: ...` with `build: ./teslamate-supercharg
 
 ```bash
 docker compose build suc-estimator
-docker compose run --rm suc-estimator --dry-run
+docker compose run --rm -e DRY_RUN=true suc-estimator
+docker compose run --rm suc-estimator
 ```
 
 ## Environment variables
@@ -108,6 +109,7 @@ docker compose run --rm suc-estimator --dry-run
 | `LOOKBACK_DAYS` | No | `90` | How far back to scan |
 | `OVERWRITE_EXISTING` | No | `false` | Also rewrite non-null costs |
 | `ALLOW_CROSS_TOU` | No | `false` | If `true`, estimate sessions that cross a time-of-use (TOU) rate change using the **start-time** rate (skipped by default) |
+| `DRY_RUN` | No | `false` | If `true`, log estimates without writing to the database |
 | `CACHE_DIR` | No | `/cache` | Directory for the rates cache |
 | `CACHE_TTL_SECONDS` | No | `43200` | Rate cache lifetime (12 hours) |
 
