@@ -6,6 +6,8 @@ import argparse
 import logging
 import os
 import sys
+import time
+from argparse import Namespace
 
 from suc_estimator import __version__
 from suc_estimator.db import connect, fetch_sessions, update_cost
@@ -68,34 +70,26 @@ def build_parser() -> argparse.ArgumentParser:
         default=_env_bool("ALLOW_CROSS_TOU", False),
         help="Estimate sessions that cross a time-of-use rate change using the start-time rate (skipped by default)",
     )
+    p.add_argument(
+        "--update-interval-seconds",
+        type=int,
+        default=int(_env("UPDATE_INTERVAL_SECONDS", "0") or 0),
+        help=(
+            "If > 0, keep running and re-scan on this interval (TeslaMateAgile-style). "
+            "0 = run once and exit (default). Also UPDATE_INTERVAL_SECONDS."
+        ),
+    )
     p.add_argument("-v", "--verbose", action="store_true")
     return p
 
 
-def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
-    logging.basicConfig(
-        level=logging.DEBUG if args.verbose else logging.INFO,
-        format="%(asctime)s %(levelname)s %(message)s",
-    )
-
-    log.info("suc-estimator %s", __version__)
-
-    host = _env("DATABASE_HOST", "database")
-    port = int(_env("DATABASE_PORT", "5432") or 5432)
-    name = _env("DATABASE_NAME", "teslamate")
-    user = _env("DATABASE_USER", "teslamate")
-    password = _env("DATABASE_PASS") or _env("DATABASE_PASSWORD")
-    if not password:
-        log.error("DATABASE_PASS is required")
-        return 2
-
+def run_once(args: Namespace, *, host: str, port: int, name: str, user: str, password: str) -> int:
     log.info("Fetching public Supercharger rates from %s", args.price_url)
     payload = fetch_prices(url=args.price_url, cache_dir=args.cache_dir, ttl_seconds=args.cache_ttl)
     stations = load_stations(payload, family=args.pricing_family)
     log.info("Loaded %d stations with %s tariffs", len(stations), args.pricing_family)
     if not stations:
-        log.error("No priced stations loaded \u2014 aborting")
+        log.error("No priced stations loaded \u2014 aborting this pass")
         return 1
 
     log.info("Connecting to TeslaMate DB %s@%s:%s/%s", user, host, port, name)
@@ -145,6 +139,42 @@ def main(argv: list[str] | None = None) -> int:
             args.dry_run,
         )
     return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
+    logging.basicConfig(
+        level=logging.DEBUG if args.verbose else logging.INFO,
+        format="%(asctime)s %(levelname)s %(message)s",
+    )
+
+    log.info("suc-estimator %s", __version__)
+
+    host = _env("DATABASE_HOST", "database")
+    port = int(_env("DATABASE_PORT", "5432") or 5432)
+    name = _env("DATABASE_NAME", "teslamate")
+    user = _env("DATABASE_USER", "teslamate")
+    password = _env("DATABASE_PASS") or _env("DATABASE_PASSWORD")
+    if not password:
+        log.error("DATABASE_PASS is required")
+        return 2
+
+    interval = max(0, int(args.update_interval_seconds))
+    if interval <= 0:
+        return run_once(args, host=host, port=port, name=name, user=user, password=password)
+
+    log.info("Loop mode: scanning every %s seconds (Ctrl+C to stop)", interval)
+    while True:
+        try:
+            run_once(args, host=host, port=port, name=name, user=user, password=password)
+        except Exception:
+            log.exception("Pass failed; will retry after interval")
+        log.info("Sleeping %s seconds until next pass", interval)
+        try:
+            time.sleep(interval)
+        except KeyboardInterrupt:
+            log.info("Stopped")
+            return 0
 
 
 if __name__ == "__main__":
