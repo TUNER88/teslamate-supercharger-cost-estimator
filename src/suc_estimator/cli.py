@@ -44,6 +44,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--price-url", default=_env("PRICE_SOURCE_URL", DEFAULT_URL) or DEFAULT_URL)
     p.add_argument("--cache-dir", default=_env("CACHE_DIR", "/cache") or "/cache")
     p.add_argument("--cache-ttl", type=int, default=int(_env("CACHE_TTL_SECONDS", "43200") or 43200))
+    p.add_argument(
+        "--allow-cross-tou",
+        action="store_true",
+        default=(_env("ALLOW_CROSS_TOU", "false") or "false").lower() in {"1", "true", "yes"},
+        help="Estimate sessions that cross a time-of-use rate change using the start-time rate (skipped by default)",
+    )
     p.add_argument("-v", "--verbose", action="store_true")
     return p
 
@@ -69,7 +75,7 @@ def main(argv: list[str] | None = None) -> int:
     stations = load_stations(payload, family=args.pricing_family)
     log.info("Loaded %d stations with %s tariffs", len(stations), args.pricing_family)
     if not stations:
-        log.error("No priced stations loaded — aborting")
+        log.error("No priced stations loaded \u2014 aborting")
         return 1
 
     log.info("Connecting to TeslaMate DB %s@%s:%s/%s", user, host, port, name)
@@ -81,7 +87,12 @@ def main(argv: list[str] | None = None) -> int:
 
         ok = unmatched = skipped = written = 0
         for session in sessions:
-            result = estimate_session(session, stations, match_radius_m=args.match_radius_m)
+            result = estimate_session(
+                session,
+                stations,
+                match_radius_m=args.match_radius_m,
+                allow_cross_tou=args.allow_cross_tou,
+            )
             if result.status == "ok":
                 ok += 1
                 msg = (

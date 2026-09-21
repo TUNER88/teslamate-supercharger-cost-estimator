@@ -37,11 +37,28 @@ def looks_like_supercharger(session: ChargingSession) -> bool:
     return bool(session.geofence_name and SUC_NAME_RE.search(session.geofence_name))
 
 
+def crosses_tou_window(station: Station, session: ChargingSession) -> bool:
+    """True if start and end fall in different tariff windows (or end has no window)."""
+    if session.end_date is None:
+        return False
+    start_window = rate_at(station, session.start_date)
+    end_window = rate_at(station, session.end_date)
+    if start_window is None or end_window is None:
+        return start_window is not end_window
+    return (
+        start_window.price_micro != end_window.price_micro
+        or start_window.start_minute != end_window.start_minute
+        or start_window.end_minute != end_window.end_minute
+        or start_window.days != end_window.days
+    )
+
+
 def estimate_session(
     session: ChargingSession,
     stations: list[Station],
     *,
     match_radius_m: float = 400.0,
+    allow_cross_tou: bool = False,
 ) -> EstimateResult:
     energy = session_energy_kwh(session)
     if energy is None or energy <= 0:
@@ -89,6 +106,20 @@ def estimate_session(
             None,
             "skip",
             "no tariff window for start time",
+        )
+
+    if not allow_cross_tou and crosses_tou_window(station, session):
+        return EstimateResult(
+            session.id,
+            station.id,
+            station.name,
+            distance,
+            energy,
+            None,
+            station.currency,
+            None,
+            "skip",
+            "crosses time-of-use rate change (opt in with --allow-cross-tou)",
         )
 
     rate = micro_to_currency(window.price_micro)
