@@ -136,17 +136,26 @@ This project uses [Semantic Versioning](https://semver.org/):
 - **Source of truth:** `version` in [`pyproject.toml`](pyproject.toml)
 - **Changelog:** [`CHANGELOG.md`](CHANGELOG.md)
 - **CLI:** `suc-estimator --version`
-- **Docker (every `main` push):** `latest`, `X.Y.Z`, `X.Y`, and `sha-<commit>`
+- **Docker (every merge to `main`):** `latest`, `X.Y.Z`, `X.Y`, and `sha-<commit>`
 
 ### Automated release
 
-On every push to `main`, CI:
+On every merge to `main`, CI:
 
 1. Publishes the Docker image tags above
 2. Reads the version from `pyproject.toml`
 3. If GitHub Release `vX.Y.Z` does **not** exist yet, creates the tag and the release automatically
 
-So a release is: bump `pyproject.toml` + update `CHANGELOG.md`, merge to `main`. No manual tagging required.
+So a release is: bump `pyproject.toml` + update `CHANGELOG.md`, open a PR, merge when CI is green.
+
+## Contributing
+
+**All changes go through a pull request** — including docs and tiny fixes. Direct pushes to `main` are blocked.
+
+1. Branch from `main`
+2. Open a PR
+3. Wait for the **test** check to pass
+4. Merge the PR (no extra reviewer required on this solo repo)
 
 ## Local development
 
