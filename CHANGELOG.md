@@ -12,11 +12,11 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 ### Added
 
 - Long-running loop mode via `UPDATE_INTERVAL_SECONDS` / `--update-interval-seconds` (TeslaMateAgile-style)
-- Compose example uses `restart: always` and a 3600s (1 hour) scan interval (no host cron required)
+- Compose example uses `restart: always` (no host cron required)
 
 ### Changed
 
-- Default CLI behaviour stays one-shot (`UPDATE_INTERVAL_SECONDS=0`) for manual/cron runs
+- Default `UPDATE_INTERVAL_SECONDS` is **3600** (loop hourly). Set `0` for a one-shot run (manual/cron)
 
 ## [0.2.0] - 2026-09-21
 

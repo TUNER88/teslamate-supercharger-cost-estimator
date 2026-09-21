@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import logging
 import os
-import sys
 import time
 from argparse import Namespace
 
@@ -73,10 +72,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--update-interval-seconds",
         type=int,
-        default=int(_env("UPDATE_INTERVAL_SECONDS", "0") or 0),
+        default=int(_env("UPDATE_INTERVAL_SECONDS", "3600") or 3600),
         help=(
-            "If > 0, keep running and re-scan on this interval (TeslaMateAgile-style). "
-            "0 = run once and exit (default). Also UPDATE_INTERVAL_SECONDS."
+            "Seconds between scans in loop mode (TeslaMateAgile-style). "
+            "Default 3600. Set to 0 to run once and exit. Also UPDATE_INTERVAL_SECONDS."
         ),
     )
     p.add_argument("-v", "--verbose", action="store_true")

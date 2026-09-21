@@ -13,9 +13,10 @@ RUN pip install --no-cache-dir .
 
 ENV CACHE_DIR=/cache \
     TZ=Europe/Berlin \
+    UPDATE_INTERVAL_SECONDS=3600 \
     SUC_ESTIMATOR_VERSION=${VERSION}
 VOLUME ["/cache"]
 
 ENTRYPOINT ["suc-estimator"]
-# No default args: a plain `docker compose run` writes costs.
-# Pass --dry-run (or DRY_RUN=true) for a preview.
+# Default: loop every 3600s. For a one-shot run: -e UPDATE_INTERVAL_SECONDS=0
+# Preview: -e DRY_RUN=true -e UPDATE_INTERVAL_SECONDS=0
