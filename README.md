@@ -24,10 +24,10 @@ Keep home energy pricing (e.g. TeslaMateAgile) separate.
 1. Download (and cache) Europe Supercharger tariffs.
 2. Load finished TeslaMate sessions with `cost IS NULL` (default) for **all cars** in the database.
 3. Match each session to the nearest priced station within ~400 m (geofence or position coordinates).
-4. Pick the time-of-use €/kWh window for the session start (station timezone).
+4. Pick the **time-of-use (TOU)** €/kWh window for the session start (station timezone). TOU means the published rate can change by clock time at that station (for example cheaper at night, more expensive during the day).
 5. Set `cost = energy_kWh × rate` (uses the larger of `charge_energy_used` / `charge_energy_added`).
 
-Sessions that **start in one time-of-use window and end in another** are **skipped by default** (the tool does not split energy across rates). Opt in with `ALLOW_CROSS_TOU=true` or `--allow-cross-tou` to price the whole session at the start-window rate.
+Sessions that **start in one TOU window and end in another** are **skipped by default** (the tool does not split energy across rates). Opt in with `ALLOW_CROSS_TOU=true` or `--allow-cross-tou` to price the whole session at the start-window rate.
 
 Price integers in the public feed are **micro-units** (e.g. `420000` → `0.42 EUR/kWh`).
 
@@ -107,7 +107,7 @@ docker compose run --rm suc-estimator --dry-run
 | `MATCH_RADIUS_M` | No | `400` | Max metres to match a station |
 | `LOOKBACK_DAYS` | No | `90` | How far back to scan |
 | `OVERWRITE_EXISTING` | No | `false` | Also rewrite non-null costs |
-| `ALLOW_CROSS_TOU` | No | `false` | If `true`, estimate sessions that cross a TOU rate change using the **start-time** rate (skipped by default) |
+| `ALLOW_CROSS_TOU` | No | `false` | If `true`, estimate sessions that cross a time-of-use (TOU) rate change using the **start-time** rate (skipped by default) |
 | `CACHE_DIR` | No | `/cache` | Directory for the rates cache |
 | `CACHE_TTL_SECONDS` | No | `43200` | Rate cache lifetime (12 hours) |
 
