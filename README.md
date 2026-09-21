@@ -47,9 +47,9 @@ Published image:
 
 Prefer a pinned tag in production:
 
-`ghcr.io/tuner88/teslamate-supercharger-cost-estimator:0.2.0`
+`ghcr.io/tuner88/teslamate-supercharger-cost-estimator:0.3.0`
 
-Also published: `0.2` (latest patch on that minor) and `sha-<commit>`.
+Also published: `0.3` (latest patch on that minor) and `sha-<commit>`.
 
 If the first pull fails with `unauthorized`, open the package on GitHub → **Package settings** → set visibility to **Public** (or `docker login ghcr.io` with a token that can read packages).
 
@@ -63,38 +63,43 @@ Paste this under `services:` (same file as your `database` service). Full copy a
 
 ```yaml
   suc-estimator:
-    image: ghcr.io/tuner88/teslamate-supercharger-cost-estimator:0.2.0
+    image: ghcr.io/tuner88/teslamate-supercharger-cost-estimator:0.3.0
     container_name: teslamate-suc-estimator
-    restart: "no"
+    restart: always
     depends_on:
       - database
     environment:
       - DATABASE_PASS=${DATABASE_PASS}
+      - UPDATE_INTERVAL_SECONDS=300
     volumes:
       - ./suc-estimator-cache:/cache
 ```
 
-Only `DATABASE_PASS` is required (same Postgres password as TeslaMate). Other settings use built-in defaults (see [Environment variables](#environment-variables)). A normal run **writes** costs; use `DRY_RUN=true` or `--dry-run` for a preview.
+Only `DATABASE_PASS` is required (same Postgres password as TeslaMate). With `UPDATE_INTERVAL_SECONDS=300` and `restart: always`, the container stays up and re-scans about every 5 minutes (same idea as TeslaMateAgile). Other settings use built-in defaults (see [Environment variables](#environment-variables)).
 
-### 2. Pull and run
+### 2. Start it
 
 ```bash
 docker compose pull suc-estimator
-docker compose run --rm -e DRY_RUN=true suc-estimator
-docker compose run --rm suc-estimator
+docker compose up -d suc-estimator
+docker compose logs -f suc-estimator
 ```
 
-Check the image/tool version:
+One-shot preview (no loop):
 
 ```bash
-docker compose run --rm suc-estimator --version
+docker compose run --rm -e DRY_RUN=true -e UPDATE_INTERVAL_SECONDS=0 suc-estimator
 ```
 
-The first command previews without writing. The second fills `charging_processes.cost` where it is still null (for every car in that TeslaMate DB).
+Check the version:
 
-### 3. Schedule (optional)
+```bash
+docker compose run --rm -e UPDATE_INTERVAL_SECONDS=0 suc-estimator --version
+```
 
-Twice daily is enough:
+### 3. One-shot / cron (optional)
+
+If you prefer cron instead of a long-running container, set `UPDATE_INTERVAL_SECONDS=0` (or omit it) and `restart: "no"`, then:
 
 ```cron
 0 6,18 * * * cd /path/to/teslamate && docker compose run --rm suc-estimator
@@ -110,8 +115,7 @@ In the Compose service, replace `image: ...` with `build: ./teslamate-supercharg
 
 ```bash
 docker compose build suc-estimator
-docker compose run --rm -e DRY_RUN=true suc-estimator
-docker compose run --rm suc-estimator
+docker compose up -d suc-estimator
 ```
 
 ## Environment variables
@@ -130,10 +134,11 @@ docker compose run --rm suc-estimator
 | `OVERWRITE_EXISTING` | No | `false` | Also rewrite non-null costs |
 | `ALLOW_CROSS_TOU` | No | `false` | If `true`, estimate sessions that cross a time-of-use (TOU) rate change using the **start-time** rate (skipped by default) |
 | `DRY_RUN` | No | `false` | If `true`, log estimates without writing to the database |
+| `UPDATE_INTERVAL_SECONDS` | No | `0` | If `> 0`, keep running and re-scan on this interval (Agile-style). `0` = run once and exit |
 | `CACHE_DIR` | No | `/cache` | Directory for the rates cache |
 | `CACHE_TTL_SECONDS` | No | `43200` | Rate cache lifetime (12 hours) |
 
-CLI flags mirror these (`--version`, `--dry-run`, `--lookback-days`, `--match-radius-m`, `--overwrite`, `--allow-cross-tou`, …).
+CLI flags mirror these (`--version`, `--dry-run`, `--update-interval-seconds`, `--lookback-days`, `--match-radius-m`, `--overwrite`, `--allow-cross-tou`, …).
 
 ## Versioning
 
@@ -150,7 +155,7 @@ On every merge to `main`, CI:
 
 1. Publishes the Docker image tags above
 2. Reads the version from `pyproject.toml`
-3. If GitHub Release `vX.Y.Z` does **not** exist yet, creates the tag and the release automatically (including the Compose snippet as a downloadable asset)
+3. If GitHub Release `vX.Y.Z` does **not** exist yet, creates the tag and the release automatically (body includes the CHANGELOG section for that version)
 
 So a release is: bump `pyproject.toml` + update `CHANGELOG.md`, open a PR, merge when CI is green.
 
