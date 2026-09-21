@@ -167,3 +167,4 @@ Please update [`CHANGELOG.md`](CHANGELOG.md) for user-facing changes. Releases a
 ## License
 
 [MIT](LICENSE)
+
