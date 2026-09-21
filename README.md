@@ -26,27 +26,32 @@ Use this when you do not want to give a Tesla refresh token to a sidecar. Keep h
 
 Price integers in the public feed are **micro-units** (e.g. `420000` → `0.42 EUR/kWh`).
 
-## Docker Compose (TeslaMate)
+## Quick start (prebuilt image)
 
-Clone next to your TeslaMate compose file:
+Image: `ghcr.io/tuner88/teslamate-supercharger-cost-estimator:latest`
+
+Paste the service from [`deploy/docker-compose.snippet.yml`](deploy/docker-compose.snippet.yml) into your TeslaMate `docker-compose.yml` (same file as `database`). Set `DATABASE_PASS` to the same Postgres password TeslaMate uses.
 
 ```bash
-git clone https://github.com/TUNER88/teslamate-supercharger-cost-estimator.git
 mkdir -p suc-estimator-cache
-```
-
-Paste the service from [`deploy/docker-compose.snippet.yml`](deploy/docker-compose.snippet.yml) into the same compose file as `database`. Set `DATABASE_PASS` to the same password as TeslaMate Postgres.
-
-```bash
-docker compose build suc-estimator
+docker compose pull suc-estimator
 docker compose run --rm suc-estimator --dry-run
 docker compose run --rm suc-estimator
 ```
 
-Suggested cron (invoices are not involved; twice daily is plenty):
+Suggested cron (twice daily is enough):
 
 ```cron
 0 6,18 * * * cd /path/to/teslamate && docker compose run --rm suc-estimator
+```
+
+If `docker pull` asks to log in, the GHCR package is still private — open the package on GitHub → **Package settings** → change visibility to **Public** (one-time).
+
+### Build from source (optional)
+
+```bash
+git clone https://github.com/TUNER88/teslamate-supercharger-cost-estimator.git
+# then use `build: ./teslamate-supercharger-cost-estimator` instead of `image:`
 ```
 
 ## Configuration
