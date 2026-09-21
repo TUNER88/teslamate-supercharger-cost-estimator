@@ -9,12 +9,13 @@ Rates come from [SuC Tracker](https://suc-tracker.eu/) (`/data/europe.json`). Th
 | | This tool | Invoice importers (e.g. ownership-API tools) |
 |--|-----------|-----------------------------------------------|
 | Tesla account | Not needed | Required |
+| Shared / fleet vehicles | Works (needs only TeslaMate sessions) | Usually fails if you cannot access that account’s invoices |
 | Source | Public station tariffs | Your Tesla invoices |
 | Idle / congestion fees | Not included | Included when billed |
 | Membership / credits | Uses published Tesla-owner tariff | Exact billed amount |
 | Accuracy | Good approximation | Exact |
 
-Use this when you do not want to give a Tesla refresh token to a sidecar. Keep home energy pricing (e.g. TeslaMateAgile) separate.
+Use this when you do not want to give a Tesla refresh token to a sidecar, or when you log Supercharging on a **shared vehicle** whose invoices you cannot see. Keep home energy pricing (e.g. TeslaMateAgile) separate.
 
 ## How it works
 
