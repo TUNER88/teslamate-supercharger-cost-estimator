@@ -1,0 +1,29 @@
+# Paste under services: in your TeslaMate docker-compose.yml
+# Clone this repo next to that file as ./teslamate-supercharger-cost-estimator
+#
+# Dry-run:  docker compose run --rm suc-estimator --dry-run
+# Apply:    docker compose run --rm suc-estimator
+# Cron:     0 6,18 * * * cd /path/to/teslamate && docker compose run --rm suc-estimator
+
+  suc-estimator:
+    build: ./teslamate-supercharger-cost-estimator
+    container_name: teslamate-suc-estimator
+    restart: "no"
+    depends_on:
+      - database
+    environment:
+      - DATABASE_HOST=database
+      - DATABASE_PORT=5432
+      - DATABASE_NAME=teslamate
+      - DATABASE_USER=teslamate
+      - DATABASE_PASS=${DATABASE_PASS}
+      - PRICE_SOURCE_URL=https://suc-tracker.eu/data/europe.json
+      - CACHE_DIR=/cache
+      - CACHE_TTL_SECONDS=43200
+      - PRICING_FAMILY=tesla
+      - MATCH_RADIUS_M=400
+      - LOOKBACK_DAYS=90
+      - OVERWRITE_EXISTING=false
+      - TZ=Europe/Berlin
+    volumes:
+      - ./suc-estimator-cache:/cache
