@@ -6,6 +6,8 @@ Estimate Supercharger session costs in [TeslaMate](https://github.com/teslamate-
 
 Rates come from [SuC Tracker](https://suc-tracker.eu/) (`/data/europe.json`). The tool matches finished charging sessions to nearby Superchargers and writes an estimated total into `charging_processes.cost`.
 
+Current version: **0.2.0** (see [CHANGELOG.md](CHANGELOG.md)).
+
 ## Estimate vs billed cost
 
 | | This tool | Invoice importers (e.g. ownership-API tools) |
@@ -37,6 +39,12 @@ Published image:
 
 `ghcr.io/tuner88/teslamate-supercharger-cost-estimator:latest`
 
+Prefer a pinned tag in production:
+
+`ghcr.io/tuner88/teslamate-supercharger-cost-estimator:0.2.0`
+
+Also published: `0.2` (latest patch on that minor) and `sha-<commit>`.
+
 If the first pull fails with `unauthorized`, open the package on GitHub → **Package settings** → set visibility to **Public** (or `docker login ghcr.io` with a token that can read packages).
 
 ### 1. Add the service to your TeslaMate Compose file
@@ -49,7 +57,7 @@ Paste this under `services:` (same file as your `database` service). Full copy a
 
 ```yaml
   suc-estimator:
-    image: ghcr.io/tuner88/teslamate-supercharger-cost-estimator:latest
+    image: ghcr.io/tuner88/teslamate-supercharger-cost-estimator:0.2.0
     container_name: teslamate-suc-estimator
     restart: "no"
     depends_on:
@@ -68,6 +76,12 @@ Only `DATABASE_PASS` is required (same Postgres password as TeslaMate). Other se
 docker compose pull suc-estimator
 docker compose run --rm -e DRY_RUN=true suc-estimator
 docker compose run --rm suc-estimator
+```
+
+Check the image/tool version:
+
+```bash
+docker compose run --rm suc-estimator --version
 ```
 
 The first command previews without writing. The second fills `charging_processes.cost` where it is still null (for every car in that TeslaMate DB).
@@ -113,7 +127,19 @@ docker compose run --rm suc-estimator
 | `CACHE_DIR` | No | `/cache` | Directory for the rates cache |
 | `CACHE_TTL_SECONDS` | No | `43200` | Rate cache lifetime (12 hours) |
 
-CLI flags mirror these (`--dry-run`, `--lookback-days`, `--match-radius-m`, `--overwrite`, `--allow-cross-tou`, …).
+CLI flags mirror these (`--version`, `--dry-run`, `--lookback-days`, `--match-radius-m`, `--overwrite`, `--allow-cross-tou`, …).
+
+## Versioning
+
+This project uses [Semantic Versioning](https://semver.org/):
+
+- **Source of truth:** `version` in [`pyproject.toml`](pyproject.toml)
+- **Changelog:** [`CHANGELOG.md`](CHANGELOG.md)
+- **CLI:** `suc-estimator --version`
+- **Docker (on each `main` push):** `latest`, `X.Y.Z`, `X.Y`, and `sha-<commit>`
+- **GitHub Release:** push a tag `vX.Y.Z` (for example `v0.2.0`) to publish a release and the matching semver image tags
+
+To cut a release: bump `pyproject.toml` + `CHANGELOG.md`, merge to `main`, then tag `vX.Y.Z` on that commit.
 
 ## Local development
 
@@ -121,6 +147,7 @@ CLI flags mirror these (`--dry-run`, `--lookback-days`, `--match-radius-m`, `--o
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 pytest
+suc-estimator --version
 ```
 
 ## Limitations

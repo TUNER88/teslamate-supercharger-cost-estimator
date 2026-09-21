@@ -1,15 +1,15 @@
 # Paste under services: in your TeslaMate docker-compose.yml
-# Image: ghcr.io/tuner88/teslamate-supercharger-cost-estimator:latest
+# Image: ghcr.io/tuner88/teslamate-supercharger-cost-estimator:0.2.0
 #
 # Only DATABASE_PASS is required; see README for the full env table.
 # mkdir -p suc-estimator-cache
 # docker compose pull suc-estimator
-# Dry-run:  docker compose run --rm suc-estimator --dry-run
+# Preview:  docker compose run --rm -e DRY_RUN=true suc-estimator
 # Apply:    docker compose run --rm suc-estimator
 # Cron:     0 6,18 * * * cd /path/to/teslamate && docker compose run --rm suc-estimator
 
   suc-estimator:
-    image: ghcr.io/tuner88/teslamate-supercharger-cost-estimator:latest
+    image: ghcr.io/tuner88/teslamate-supercharger-cost-estimator:0.2.0
     container_name: teslamate-suc-estimator
     restart: "no"
     depends_on:
