@@ -6,60 +6,39 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 
-Estimate Supercharger session costs in [TeslaMate](https://github.com/teslamate-org/teslamate) from **public** published rates — **no Tesla account login**.
+Fill Supercharger costs in [TeslaMate](https://github.com/teslamate-org/teslamate) from **public** station tariffs — **no Tesla account or refresh token**.
 
-**Covers every car on your TeslaMate instance**, not only vehicles you own. Shared and fleet cars get the same estimates as long as their Supercharging sessions are logged in TeslaMate. Invoice importers usually cannot do that, because they need access to that account’s Tesla invoices.
+Useful when you run TeslaMate for one or more cars (including shared / fleet vehicles) and want approximate Supercharger spend in Grafana without importing Tesla invoices.
 
-Rates come from [SuC Tracker](https://suc-tracker.eu/) (`/data/europe.json`). The tool matches finished charging sessions to nearby Superchargers and writes an estimated total into `charging_processes.cost`.
+> **Estimates only.** Costs are derived from published €/kWh rates and session energy. They will not always match Tesla’s billed invoice (idle fees, memberships, credits, and local promotions are out of scope).
 
-See [CHANGELOG.md](CHANGELOG.md) for release history.
+## Features
 
-## Estimate vs billed cost
+- No Tesla login — rates from [SuC Tracker](https://suc-tracker.eu/) public Europe feed
+- Works for **every car** in your TeslaMate database (not only cars you “own” in the Tesla app)
+- Matches sessions to nearby Superchargers (~400 m) and writes `charging_processes.cost`
+- Respects time-of-use (TOU) windows; sessions that cross a rate change are skipped by default
+- Runs as a long-lived Docker service (hourly by default) or as a one-shot / cron job
+- Optional dry-run before writing
 
-| | This tool | Invoice importers (e.g. ownership-API tools) |
-|--|-----------|-----------------------------------------------|
-| Tesla account | Not needed | Required |
-| Shared / fleet / all cars in TeslaMate | **Yes** — any session in the database | Only cars whose invoices you can access |
-| Source | Public station tariffs | Your Tesla invoices |
-| Idle / congestion fees | Not included | Included when billed |
-| Membership / credits | Uses published Tesla-owner tariff | Exact billed amount |
-| Accuracy | Good approximation | Exact |
+## Requirements
 
-Keep home energy pricing (e.g. TeslaMateAgile) separate.
+- A working [TeslaMate](https://github.com/teslamate-org/teslamate) stack (Docker Compose is the usual setup)
+- Network access from the estimator container to TeslaMate Postgres and to the public rates URL
+- Python 3.11+ if you run from source
 
-## How it works
+## Quick start (Docker Compose)
 
-1. Download (and cache) Europe Supercharger tariffs.
-2. Load finished TeslaMate sessions with `cost IS NULL` (default) for **all cars** in the database.
-3. Match each session to the nearest priced station within ~400 m (geofence or position coordinates).
-4. Pick the **time-of-use (TOU)** €/kWh window for the session start (station timezone). TOU means the published rate can change by clock time at that station (for example cheaper at night, more expensive during the day).
-5. Set `cost = energy_kWh × rate` (uses the larger of `charge_energy_used` / `charge_energy_added`).
+Image: `ghcr.io/tuner88/teslamate-supercharger-cost-estimator:0.3.0`  
+(`:latest`, `:0.3`, and `sha-…` tags are also published.)
 
-Sessions that **start in one TOU window and end in another** are **skipped by default** (the tool does not split energy across rates). Opt in with `ALLOW_CROSS_TOU=true` or `--allow-cross-tou` to price the whole session at the start-window rate.
-
-Price integers in the public feed are **micro-units** (e.g. `420000` → `0.42 EUR/kWh`).
-
-## Use the Docker image (recommended)
-
-Published image:
-
-`ghcr.io/tuner88/teslamate-supercharger-cost-estimator:latest`
-
-Prefer a pinned tag in production:
-
-`ghcr.io/tuner88/teslamate-supercharger-cost-estimator:0.3.0`
-
-Also published: `0.3` (latest patch on that minor) and `sha-<commit>`.
-
-If the first pull fails with `unauthorized`, open the package on GitHub → **Package settings** → set visibility to **Public** (or `docker login ghcr.io` with a token that can read packages).
-
-### 1. Add the service to your TeslaMate Compose file
+1. Create a cache directory next to your TeslaMate compose file:
 
 ```bash
 mkdir -p suc-estimator-cache
 ```
 
-Paste this under `services:` (same file as your `database` service). Full copy also in [`deploy/docker-compose.snippet.yml`](deploy/docker-compose.snippet.yml):
+2. Add this service alongside your existing `database` service (full copy in [`deploy/docker-compose.snippet.yml`](deploy/docker-compose.snippet.yml)):
 
 ```yaml
   suc-estimator:
@@ -74,9 +53,9 @@ Paste this under `services:` (same file as your `database` service). Full copy a
       - ./suc-estimator-cache:/cache
 ```
 
-Only `DATABASE_PASS` is required (same Postgres password as TeslaMate). By default the process loops every **3600** seconds (`UPDATE_INTERVAL_SECONDS`). With `restart: always`, the container stays up and keeps filling new Supercharger costs. Other settings use built-in defaults (see [Environment variables](#environment-variables)).
+`DATABASE_PASS` must match TeslaMate Postgres. Everything else has defaults (`UPDATE_INTERVAL_SECONDS=3600`, host `database`, and so on).
 
-### 2. Start it
+3. Start it:
 
 ```bash
 docker compose pull suc-estimator
@@ -84,107 +63,105 @@ docker compose up -d suc-estimator
 docker compose logs -f suc-estimator
 ```
 
-One-shot preview (no loop):
+Preview without writing:
 
 ```bash
 docker compose run --rm -e DRY_RUN=true -e UPDATE_INTERVAL_SECONDS=0 suc-estimator
 ```
 
-Check the version:
+If `docker pull` returns `unauthorized`, the GHCR package may still be private — set the package visibility to **Public** under the repo’s Packages settings, or `docker login ghcr.io` with a token that can read packages.
 
-```bash
-docker compose run --rm -e UPDATE_INTERVAL_SECONDS=0 suc-estimator --version
-```
+### One-shot / cron
 
-### 3. One-shot / cron (optional)
-
-If you prefer cron instead of a long-running container, set `UPDATE_INTERVAL_SECONDS=0` and `restart: "no"`, then:
+To run once instead of looping, set `UPDATE_INTERVAL_SECONDS=0` (and usually `restart: "no"`):
 
 ```cron
 0 6,18 * * * cd /path/to/teslamate && docker compose run --rm -e UPDATE_INTERVAL_SECONDS=0 suc-estimator
 ```
 
-### Build from source (optional)
+## How it works
 
-```bash
-git clone https://github.com/TUNER88/teslamate-supercharger-cost-estimator.git
-```
+1. Download and cache Europe Supercharger tariffs from SuC Tracker.
+2. Load finished TeslaMate charging sessions with `cost IS NULL` (unless overwrite is enabled).
+3. Match each session to the nearest priced station within about 400 m.
+4. Select the TOU €/kWh window for the **session start** in the station timezone.
+5. Write `cost = energy_kWh × rate` (larger of used / added energy).
 
-In the Compose service, replace `image: ...` with `build: ./teslamate-supercharger-cost-estimator`, then:
+Sessions that start in one TOU window and end in another are **skipped by default**. Set `ALLOW_CROSS_TOU=true` to price the whole session at the start-window rate instead.
 
-```bash
-docker compose build suc-estimator
-docker compose up -d suc-estimator
-```
+Feed prices are stored as micro-units (for example `420000` → `0.42 EUR/kWh`).
 
-## Environment variables
+### Estimate vs Tesla invoice
+
+| | This project | Invoice importers |
+|--|--------------|-------------------|
+| Tesla account | Not required | Required |
+| Shared / fleet cars in TeslaMate | Supported | Only if you can access that account’s invoices |
+| Source | Public station tariffs | Tesla invoices |
+| Idle / congestion fees | Not included | Usually included when billed |
+| Membership / credits | Published owner tariff | Exact billed amount |
+| Accuracy | Approximation | Exact |
+
+Home / destination charging should stay on tools like [TeslaMateAgile](https://github.com/MattJeanes/TeslaMateAgile) or TeslaMate geofence costs — this project only targets Supercharger-like sessions near known stations.
+
+## Configuration
 
 | Variable | Required | Default | Meaning |
 |----------|----------|---------|---------|
 | `DATABASE_PASS` | **Yes** | — | Postgres password (`DATABASE_PASSWORD` also accepted) |
-| `DATABASE_HOST` | No | `database` | Postgres host (Compose service name) |
+| `DATABASE_HOST` | No | `database` | Postgres hostname |
 | `DATABASE_PORT` | No | `5432` | Postgres port |
 | `DATABASE_NAME` | No | `teslamate` | Database name |
 | `DATABASE_USER` | No | `teslamate` | Database user |
-| `PRICE_SOURCE_URL` | No | `https://suc-tracker.eu/data/europe.json` | Public rates URL |
+| `PRICE_SOURCE_URL` | No | `https://suc-tracker.eu/data/europe.json` | Public rates JSON |
 | `PRICING_FAMILY` | No | `tesla` | `tesla` or `nonTesla` |
-| `MATCH_RADIUS_M` | No | `400` | Max metres to match a station |
+| `MATCH_RADIUS_M` | No | `400` | Max match distance (metres) |
 | `LOOKBACK_DAYS` | No | `90` | How far back to scan |
-| `OVERWRITE_EXISTING` | No | `false` | Also rewrite non-null costs |
-| `ALLOW_CROSS_TOU` | No | `false` | If `true`, estimate sessions that cross a time-of-use (TOU) rate change using the **start-time** rate (skipped by default) |
-| `DRY_RUN` | No | `false` | If `true`, log estimates without writing to the database |
-| `UPDATE_INTERVAL_SECONDS` | No | `3600` | Seconds between scans in loop mode. `0` = run once and exit |
-| `CACHE_DIR` | No | `/cache` | Directory for the rates cache |
-| `CACHE_TTL_SECONDS` | No | `43200` | Rate cache lifetime (12 hours) |
+| `OVERWRITE_EXISTING` | No | `false` | Also rewrite rows that already have a cost |
+| `ALLOW_CROSS_TOU` | No | `false` | Allow sessions that cross a TOU boundary (priced at start rate) |
+| `DRY_RUN` | No | `false` | Log estimates without writing |
+| `UPDATE_INTERVAL_SECONDS` | No | `3600` | Loop interval; `0` = run once and exit |
+| `CACHE_DIR` | No | `/cache` | Rate cache directory |
+| `CACHE_TTL_SECONDS` | No | `43200` | Cache lifetime (12 hours) |
 
-CLI flags mirror these (`--version`, `--dry-run`, `--update-interval-seconds`, `--lookback-days`, `--match-radius-m`, `--overwrite`, `--allow-cross-tou`, …).
+CLI flags map to the same options (`--dry-run`, `--update-interval-seconds`, `--lookback-days`, …).
 
-## Versioning
-
-This project uses [Semantic Versioning](https://semver.org/):
-
-- **Source of truth:** `version` in [`pyproject.toml`](pyproject.toml)
-- **Changelog:** [`CHANGELOG.md`](CHANGELOG.md)
-- **CLI:** `suc-estimator --version`
-- **Docker (every merge to `main`):** `latest`, `X.Y.Z`, `X.Y`, and `sha-<commit>`
-
-### Automated release
-
-On every merge to `main`, CI:
-
-1. Publishes the Docker image tags above
-2. Reads the version from `pyproject.toml`
-3. If GitHub Release `vX.Y.Z` does **not** exist yet, creates the tag and the release automatically (body includes the CHANGELOG section for that version)
-
-So a release is: bump `pyproject.toml` + update `CHANGELOG.md`, open a PR, merge when CI is green.
-
-## Contributing
-
-**All changes go through a pull request** — including docs and tiny fixes. Direct pushes to `main` are blocked.
-
-1. Branch from `main`
-2. Open a PR
-3. Wait for the **test** check to pass
-4. Merge the PR (no extra reviewer required on this solo repo)
-
-Merged PR branches are deleted automatically.
-
-## Local development
+## Build from source
 
 ```bash
+git clone https://github.com/TUNER88/teslamate-supercharger-cost-estimator.git
+cd teslamate-supercharger-cost-estimator
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 pytest
-suc-estimator --version
+suc-estimator --help
 ```
+
+Or point Compose at a local build: `build: ./teslamate-supercharger-cost-estimator` instead of `image:`.
 
 ## Limitations
 
-- Energy-only estimate (no idle fees).
-- Public coverage depends on SuC Tracker (strong in Europe).
-- Sessions without coordinates cannot be matched.
-- Home / destination chargers should stay on Agile or geofence cost settings; this tool only fills costs for sessions near a known Supercharger.
+- Energy-only estimates (no idle / congestion fees).
+- Coverage follows the SuC Tracker Europe feed (strong in Europe; incomplete elsewhere).
+- Sessions without usable coordinates cannot be matched.
+- Not a billing or tax tool — treat values as approximate.
+
+## Contributing
+
+Issues and pull requests are welcome.
+
+1. Fork and branch from `main`
+2. Open a PR
+3. Wait for CI (`test`) to pass
+
+Please update [`CHANGELOG.md`](CHANGELOG.md) for user-facing changes. Releases are tagged from the `version` in [`pyproject.toml`](pyproject.toml); see the changelog for history.
+
+## Credits
+
+- [TeslaMate](https://github.com/teslamate-org/teslamate) — vehicle and charging data
+- [SuC Tracker](https://suc-tracker.eu/) — public Supercharger tariff data
+- [TeslaMateAgile](https://github.com/MattJeanes/TeslaMateAgile) — inspiration for always-on cost updates in TeslaMate
 
 ## License
 
-MIT
+[MIT](LICENSE)
