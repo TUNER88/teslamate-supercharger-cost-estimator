@@ -7,6 +7,7 @@ import logging
 import os
 import sys
 
+from suc_estimator import __version__
 from suc_estimator.db import connect, fetch_sessions, update_cost
 from suc_estimator.estimator import estimate_session
 from suc_estimator.pricesource import DEFAULT_URL, fetch_prices
@@ -33,6 +34,11 @@ def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="suc-estimator",
         description="Estimate TeslaMate Supercharger costs from public rates (no Tesla account).",
+    )
+    p.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {__version__}",
     )
     p.add_argument(
         "--dry-run",
@@ -72,6 +78,8 @@ def main(argv: list[str] | None = None) -> int:
         level=logging.DEBUG if args.verbose else logging.INFO,
         format="%(asctime)s %(levelname)s %(message)s",
     )
+
+    log.info("suc-estimator %s", __version__)
 
     host = _env("DATABASE_HOST", "database")
     port = int(_env("DATABASE_PORT", "5432") or 5432)

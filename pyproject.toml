@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "teslamate-supercharger-cost-estimator"
-version = "0.1.1"
+version = "0.2.0"
 description = "Estimate Tesla Supercharger costs in TeslaMate from public rates (no Tesla account)"
 readme = "README.md"
 requires-python = ">=3.11"
