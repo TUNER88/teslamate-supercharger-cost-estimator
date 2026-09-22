@@ -38,13 +38,26 @@ def fetch_prices(
             log.warning("Cache unreadable (%s); re-fetching", exc)
 
     log.info("Downloading rates…")
-    with httpx.Client(timeout=timeout, follow_redirects=True) as client:
-        resp = client.get(
-            url,
-            headers={"Accept": "application/json", "User-Agent": "suc-estimator/0.1"},
-        )
-        resp.raise_for_status()
-        data = resp.json()
+    try:
+        with httpx.Client(timeout=timeout, follow_redirects=True) as client:
+            resp = client.get(
+                url,
+                headers={"Accept": "application/json", "User-Agent": "suc-estimator/0.1"},
+            )
+            resp.raise_for_status()
+            data = resp.json()
+    except httpx.HTTPError as exc:
+        # Transient network failures should not kill a scheduled run: fall back
+        # to the last good copy, however old, and let the next run refresh it.
+        if cache_file.exists():
+            try:
+                stale = json.loads(cache_file.read_text(encoding="utf-8"))
+            except (OSError, ValueError, json.JSONDecodeError):
+                stale = None
+            if stale is not None:
+                log.warning("Rates fetch failed (%s); using stale cache", exc)
+                return stale
+        raise
 
     cache_file.write_text(json.dumps(data), encoding="utf-8")
     meta_file.write_text(

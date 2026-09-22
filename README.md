@@ -93,6 +93,12 @@ Sessions that start in one TOU window and end in another are **skipped by defaul
 
 Feed prices are stored as micro-units (for example `420000` → `0.42 EUR/kWh`).
 
+### Per-minute, power-tiered tariffs
+
+Some stations (e.g. Innsbruck, Bregenz) publish **per-minute, power-tiered** tariffs instead of €/kWh. They are matched and estimated too: the session's average power (`energy / duration`) selects the published power bracket, and `cost = minutes × tier rate`. Since only the average is known — not the power curve — this is an approximation, and the log line shows the average power used (e.g. `45 min × 0.6200 EUR/min @ 73 kW avg`).
+
+Price integers in the public feed are **micro-units** here as well (e.g. `420000` → `0.42 EUR/min` for a per-minute tier).
+
 ### Estimate vs Tesla invoice
 
 || This project | Invoice importers |
@@ -146,6 +152,8 @@ Or point Compose at a local build: `build: ./teslamate-supercharger-cost-estimat
 - Energy-only estimates (no idle / congestion fees).
 - Coverage follows the SuC Tracker Europe feed (strong in Europe; incomplete elsewhere).
 - Sessions without usable coordinates cannot be matched.
+- Per-minute tariff estimates use the session's **average** power, not the real power curve — matches a real Innsbruck session to its correct bracket, but a session split across brackets is priced at the average bracket's rate.
+- Home / destination chargers should stay on Agile or geofence cost settings; this tool only fills costs for sessions near a known Supercharger.
 - Not a billing or tax tool — treat values as approximate.
 
 ## Contributing

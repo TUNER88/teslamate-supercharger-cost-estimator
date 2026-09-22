@@ -23,6 +23,7 @@ class ChargingSession:
     geofence_name: str | None
     lat: float | None
     lon: float | None
+    car_id: int | None = None
 
 
 def connect(*, host: str, port: int, dbname: str, user: str, password: str) -> psycopg.Connection:
@@ -53,6 +54,7 @@ def fetch_sessions(
             cp.charge_energy_used,
             cp.cost,
             cp.geofence_id,
+            cp.car_id,
             g.name AS geofence_name,
             COALESCE(g.latitude, p.latitude) AS lat,
             COALESCE(g.longitude, p.longitude) AS lon
@@ -82,6 +84,7 @@ def fetch_sessions(
                 geofence_name=r["geofence_name"],
                 lat=_as_float(r["lat"]),
                 lon=_as_float(r["lon"]),
+                car_id=int(r["car_id"]) if r["car_id"] is not None else None,
             )
         )
     return out

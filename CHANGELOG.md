@@ -10,6 +10,26 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 ### Added
 
 - README project preview image (`docs/assets/social-preview.svg`) for discoverability
+- Support for stations that publish **per-minute, power-tiered** tariffs
+  (`pricingUnit: minute`, e.g. Innsbruck, Bregenz, Morocco). They are parsed
+  from the feed, matched to sessions, and estimated from session duration and
+  average power (`energy / duration` picks the published bracket). Previously
+  such stations were dropped entirely, so sessions there showed as
+  "unmatched" or could be matched to a *different* nearby kWh-priced station.
+- Stale-cache fallback: if the rates download fails (network outage, 5xx) and
+  a cached copy exists, the run continues with the stale copy and logs a
+  warning instead of crashing — scheduled runs survive transient outages.
+- Per-car cost summary: `car_id` is now selected from the DB and the final log
+  lists each car's session count and estimated total.
+- Warning for unmatched sessions whose geofence name identifies a
+  Supercharger (e.g. "Innsbruck Supercharger") but which found no priced
+  station within the match radius — surfaces stations missing from the feed.
+
+### Changed
+
+- `rate_at` / `select_window` now work over both kWh windows and per-minute
+  windows; `crosses_tou_window` compares windows structurally so it applies
+  to both tariff kinds.
 
 ## [0.3.0] - 2026-09-21
 
