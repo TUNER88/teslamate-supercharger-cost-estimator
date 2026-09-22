@@ -7,6 +7,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-22
+
 ### Added
 
 - README project preview image (`docs/assets/social-preview.svg`) for discoverability
@@ -64,7 +66,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Public-rate Supercharger cost estimator for TeslaMate (no Tesla account)
 - GHCR image `ghcr.io/tuner88/teslamate-supercharger-cost-estimator`
 
-[Unreleased]: https://github.com/TUNER88/teslamate-supercharger-cost-estimator/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/TUNER88/teslamate-supercharger-cost-estimator/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/TUNER88/teslamate-supercharger-cost-estimator/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/TUNER88/teslamate-supercharger-cost-estimator/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/TUNER88/teslamate-supercharger-cost-estimator/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/TUNER88/teslamate-supercharger-cost-estimator/releases/tag/v0.1.1
