@@ -31,8 +31,8 @@ Useful when you run TeslaMate for one or more cars (including shared / fleet veh
 
 ## Quick start (Docker Compose)
 
-Image: `ghcr.io/tuner88/teslamate-supercharger-cost-estimator:0.3.0`  
-(`:latest`, `:0.3`, and `sha-…` tags are also published.)
+Image: `ghcr.io/tuner88/teslamate-supercharger-cost-estimator:0.4.0`  
+(`:latest`, `:0.4`, and `sha-…` tags are also published.)
 
 1. Create a cache directory next to your TeslaMate compose file:
 
@@ -44,7 +44,7 @@ mkdir -p suc-estimator-cache
 
 ```yaml
   suc-estimator:
-    image: ghcr.io/tuner88/teslamate-supercharger-cost-estimator:0.3.0
+    image: ghcr.io/tuner88/teslamate-supercharger-cost-estimator:0.4.0
     container_name: teslamate-suc-estimator
     restart: always
     depends_on:
@@ -175,4 +175,3 @@ Please update [`CHANGELOG.md`](CHANGELOG.md) for user-facing changes. Releases a
 ## License
 
 [MIT](LICENSE)
-
