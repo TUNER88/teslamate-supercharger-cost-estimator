@@ -18,8 +18,6 @@ from suc_estimator.pricing import (
 
 SUC_NAME_RE = re.compile(r"supercharger|\bsuc\b|tesla\s*sc", re.I)
 
-DEFAULT_MIN_ENERGY_KWH = 0.5
-
 
 @dataclass(frozen=True)
 class EstimateResult:
@@ -69,26 +67,11 @@ def estimate_session(
     *,
     match_radius_m: float = 400.0,
     allow_cross_tou: bool = False,
-    min_energy_kwh: float = DEFAULT_MIN_ENERGY_KWH,
 ) -> EstimateResult:
     energy = session_energy_kwh(session)
     if energy is None or energy <= 0:
         return EstimateResult(
             session.id, None, None, None, energy, None, None, None, "skip", "no energy"
-        )
-
-    if energy < min_energy_kwh:
-        return EstimateResult(
-            session.id,
-            None,
-            None,
-            None,
-            energy,
-            None,
-            None,
-            None,
-            "skip",
-            f"energy={energy:.2f} kWh below min {min_energy_kwh}",
         )
 
     if session.lat is None or session.lon is None:
