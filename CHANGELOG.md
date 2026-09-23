@@ -7,6 +7,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-09-23
+
 ### Changed
 
 - Unmatched sessions are logged once at INFO per process (session id, geofence/place, nearest station + metres); repeats stay at DEBUG
@@ -72,7 +74,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Public-rate Supercharger cost estimator for TeslaMate (no Tesla account)
 - GHCR image `ghcr.io/tuner88/teslamate-supercharger-cost-estimator`
 
-[Unreleased]: https://github.com/TUNER88/teslamate-supercharger-cost-estimator/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/TUNER88/teslamate-supercharger-cost-estimator/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/TUNER88/teslamate-supercharger-cost-estimator/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/TUNER88/teslamate-supercharger-cost-estimator/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/TUNER88/teslamate-supercharger-cost-estimator/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/TUNER88/teslamate-supercharger-cost-estimator/compare/v0.1.1...v0.2.0
