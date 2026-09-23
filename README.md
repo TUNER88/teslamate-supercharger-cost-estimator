@@ -165,6 +165,8 @@ Issues and pull requests are welcome.
 2. Open a PR
 3. Wait for CI (`test`) to pass
 
+**Commits:** use [Conventional Commits](https://www.conventionalcommits.org/) for PR titles and commit messages (`feat:`, `fix:`, `docs:`, `chore:`, `release:`, …).
+
 Please update [`CHANGELOG.md`](CHANGELOG.md) for user-facing changes. Releases are tagged from the `version` in [`pyproject.toml`](pyproject.toml); see the changelog for history.
 
 ## Credits
