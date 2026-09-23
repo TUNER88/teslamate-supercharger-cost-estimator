@@ -17,7 +17,8 @@ Useful when you run TeslaMate for one or more cars (including shared / fleet veh
 
 - No Tesla login — rates from [SuC Tracker](https://suc-tracker.eu/) public Europe feed
 - Works for **every car** in your TeslaMate database (not only cars you “own” in the Tesla app)
-- Matches sessions to nearby Superchargers (~400 m) and writes `charging_processes.cost`
+- Matches **DC / Supercharger-like** sessions to nearby stations (~400 m) and writes `charging_processes.cost`
+- Always ignores AC home/destination charging (TeslaMate `charger_phases` rule) — no config needed
 - Respects time-of-use (TOU) windows; sessions that cross a rate change are skipped by default
 - Runs as a long-lived Docker service (hourly by default) or as a one-shot / cron job
 - Optional dry-run before writing
@@ -84,9 +85,10 @@ To run once instead of looping, set `UPDATE_INTERVAL_SECONDS=0` (and usually `re
 
 1. Download and cache Europe Supercharger tariffs from SuC Tracker.
 2. Load finished TeslaMate charging sessions with `cost IS NULL` (unless overwrite is enabled).
-3. Match each session to the nearest priced station within about 400 m.
-4. Select the TOU €/kWh window for the **session start** in the station timezone.
-5. Write `cost = energy_kWh × rate` (larger of used / added energy).
+3. Classify each session as AC or DC (TeslaMate Grafana rule on `charges.charger_phases`); **always skip AC** before matching.
+4. Match each remaining (DC) session to the nearest priced station within about 400 m.
+5. Select the TOU €/kWh window for the **session start** in the station timezone.
+6. Write `cost = energy_kWh × rate` (larger of used / added energy).
 
 Sessions that start in one TOU window and end in another are **skipped by default**. Set `ALLOW_CROSS_TOU=true` to price the whole session at the start-window rate instead.
 
@@ -109,7 +111,7 @@ Price integers in the public feed are **micro-units** here as well (e.g. `420000
 | Membership / credits | Published owner tariff | Exact billed amount |
 | Accuracy | Approximation | Exact |
 
-Home / destination charging should stay on tools like [TeslaMateAgile](https://github.com/MattJeanes/TeslaMateAgile) or TeslaMate geofence costs — this project only targets Supercharger-like sessions near known stations.
+Home / destination charging should stay on tools like [TeslaMateAgile](https://github.com/MattJeanes/TeslaMateAgile) or TeslaMate geofence costs — this project only considers **DC / Supercharger-like** sessions (AC is ignored automatically) near known stations.
 
 ## Configuration
 
@@ -152,7 +154,7 @@ Or point Compose at a local build: `build: ./teslamate-supercharger-cost-estimat
 - Coverage follows the SuC Tracker Europe feed (strong in Europe; incomplete elsewhere).
 - Sessions without usable coordinates cannot be matched.
 - Per-minute tariff estimates use the session's **average** power, not the real power curve — matches a real Innsbruck session to its correct bracket, but a session split across brackets is priced at the average bracket's rate.
-- Home / destination chargers should stay on Agile or geofence cost settings; this tool only fills costs for sessions near a known Supercharger.
+- Only DC / Supercharger-like sessions are considered; AC home/destination charging is skipped automatically (no config). Home costs stay on Agile or geofence settings.
 - Not a billing or tax tool — treat values as approximate.
 
 ## Contributing
