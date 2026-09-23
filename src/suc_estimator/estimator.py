@@ -18,6 +18,8 @@ from suc_estimator.pricing import (
 
 SUC_NAME_RE = re.compile(r"supercharger|\bsuc\b|tesla\s*sc", re.I)
 
+DEFAULT_MIN_ENERGY_KWH = 0.5
+
 
 @dataclass(frozen=True)
 class EstimateResult:
@@ -67,11 +69,26 @@ def estimate_session(
     *,
     match_radius_m: float = 400.0,
     allow_cross_tou: bool = False,
+    min_energy_kwh: float = DEFAULT_MIN_ENERGY_KWH,
 ) -> EstimateResult:
     energy = session_energy_kwh(session)
     if energy is None or energy <= 0:
         return EstimateResult(
             session.id, None, None, None, energy, None, None, None, "skip", "no energy"
+        )
+
+    if energy < min_energy_kwh:
+        return EstimateResult(
+            session.id,
+            None,
+            None,
+            None,
+            energy,
+            None,
+            None,
+            None,
+            "skip",
+            f"energy={energy:.2f} kWh below min {min_energy_kwh}",
         )
 
     if session.lat is None or session.lon is None:
@@ -87,6 +104,23 @@ def estimate_session(
         match_radius_m,
     )
     if match is None:
+        detail = f"no station within {match_radius_m:.0f} m"
+        # Enrich with absolute nearest station (outside the match radius) when available.
+        anywhere = nearest(
+            session.lat,
+            session.lon,
+            stations,
+            lambda s: (s.lat, s.lon),
+            float("inf"),
+        )
+        if anywhere is not None:
+            nearest_station, nearest_dist = anywhere
+            detail = (
+                f"no station within {match_radius_m:.0f} m "
+                f"(nearest: {nearest_station.name} @ {nearest_dist:.0f} m)"
+            )
+        elif not stations:
+            detail = f"no station within {match_radius_m:.0f} m (no stations loaded)"
         return EstimateResult(
             session.id,
             None,
@@ -97,7 +131,7 @@ def estimate_session(
             None,
             None,
             "unmatched",
-            f"no station within {match_radius_m:.0f} m",
+            detail,
         )
 
     station, distance = match
@@ -146,7 +180,7 @@ def estimate_session(
         currency=station.currency,
         cost=cost,
         status="ok",
-        detail=f"{energy:.3f} kWh × {rate:.4f} {station.currency}/kWh @ {distance:.0f} m",
+        detail=f"{energy:.3f} kWh \u00d7 {rate:.4f} {station.currency}/kWh @ {distance:.0f} m",
     )
 
 
@@ -160,7 +194,7 @@ def _estimate_minute_session(
 ) -> EstimateResult:
     """Estimate a session at a station that bills per minute (power-tiered).
 
-    Sources only publish per-minute prices in power tiers (e.g. 0–60 kW at
+    Sources only publish per-minute prices in power tiers (e.g. 0\u201360 kW at
     0.17/min). We do not have a power curve, so the session is treated as
     charging at its average power: energy / duration. The tier matching that
     average applies for the whole session.
@@ -251,7 +285,7 @@ def _estimate_minute_session(
         cost=cost,
         status="ok",
         detail=(
-            f"{minutes:.0f} min × {rate:.4f} {station.currency}/min "
+            f"{minutes:.0f} min \u00d7 {rate:.4f} {station.currency}/min "
             f"@ {avg_power_kw:.0f} kW avg @ {distance:.0f} m"
         ),
     )
