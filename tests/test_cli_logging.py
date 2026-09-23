@@ -136,3 +136,21 @@ def test_quiet_noop_pass_suppresses_ritual(caplog):
 def test_pass_outcome_tracks_unmatched_ids():
     outcome = PassOutcome(0, 0, 1, 0, frozenset({42}))
     assert outcome.unmatched_ids == frozenset({42})
+
+
+
+def test_ac_skip_logged_once_at_info(caplog):
+    ac = _session(id=77, charge_type="AC", geofence_name="Home Garage")
+    state = LoopState()
+
+    msgs1 = _run_pass([ac], state, caplog)
+    ac_infos = [m for m in msgs1 if m.startswith("skip id=77")]
+    assert len(ac_infos) == 1
+    assert "AC (charger_phases)" in ac_infos[0]
+    assert any(m.startswith("Done:") and "skipped=1" in m for m in msgs1)
+
+    caplog.clear()
+    msgs2 = _run_pass([ac], state, caplog)
+    ac_infos2 = [m for m in msgs2 if m.startswith("skip id=77")]
+    assert ac_infos2 == []  # second pass: DEBUG only
+    assert any("No changes since last pass" in m for m in msgs2)

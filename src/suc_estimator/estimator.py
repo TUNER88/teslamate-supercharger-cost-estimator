@@ -68,6 +68,23 @@ def estimate_session(
     match_radius_m: float = 400.0,
     allow_cross_tou: bool = False,
 ) -> EstimateResult:
+    # Always skip AC (home/destination) before geo-matching. Classification
+    # matches TeslaMate Grafana: mode(charger_phases) null/0 → DC, else AC.
+    # No charge samples → DC (attempt match) so sparse SuC sessions are kept.
+    if session.charge_type == "AC":
+        return EstimateResult(
+            session.id,
+            None,
+            None,
+            None,
+            session_energy_kwh(session),
+            None,
+            None,
+            None,
+            "skip",
+            "AC (charger_phases)",
+        )
+
     energy = session_energy_kwh(session)
     if energy is None or energy <= 0:
         return EstimateResult(

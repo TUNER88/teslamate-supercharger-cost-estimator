@@ -7,6 +7,16 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Changed
+
+- Always skip **AC** charging sessions before geo-matching (TeslaMate Grafana
+  `charger_phases` mode rule: null/0 → DC, else AC). Home / destination AC is
+  ignored automatically; only DC / Supercharger-like sessions are considered.
+  No config flag. Processes with no charge samples are treated as DC so sparse
+  SuC data is still matched. AC skips are logged once at INFO per session id
+  (`skip id=… AC (charger_phases)`); repeats stay at DEBUG and count toward
+  `skipped` in quiet no-op passes.
+
 ## [0.4.1] - 2026-09-23
 
 ### Changed

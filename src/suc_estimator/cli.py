@@ -32,6 +32,7 @@ class LoopState:
     """Process-lifetime state across hourly passes."""
 
     logged_unmatched: set[int] = field(default_factory=set)
+    logged_ac_skipped: set[int] = field(default_factory=set)
     prev_outcome: PassOutcome | None = None
     # First pass is always verbose; later passes may suppress ritual INFO lines.
     next_verbose: bool = True
@@ -197,7 +198,14 @@ def run_once(
                     coverage_gap.append((result.session_id, geofence_name))
             else:
                 skipped += 1
-                log.debug("skip id=%s %s", result.session_id, result.detail)
+                if result.detail == "AC (charger_phases)":
+                    if result.session_id not in state.logged_ac_skipped:
+                        state.logged_ac_skipped.add(result.session_id)
+                        log.info("skip id=%s %s", result.session_id, result.detail)
+                    else:
+                        log.debug("skip id=%s %s", result.session_id, result.detail)
+                else:
+                    log.debug("skip id=%s %s", result.session_id, result.detail)
 
         if coverage_gap:
             names = ", ".join(dict.fromkeys(name for _, name in coverage_gap))

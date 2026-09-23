@@ -24,6 +24,9 @@ class ChargingSession:
     lat: float | None
     lon: float | None
     car_id: int | None = None
+    # "AC" or "DC" — TeslaMate Grafana rule on mode(charges.charger_phases).
+    # Default DC so unit tests without an explicit type still geo-match.
+    charge_type: str = "DC"
 
 
 def connect(*, host: str, port: int, dbname: str, user: str, password: str) -> psycopg.Connection:
@@ -45,6 +48,10 @@ def fetch_sessions(
 ) -> list[ChargingSession]:
     since = datetime.now(timezone.utc) - timedelta(days=lookback_days)
     cost_clause = "" if overwrite else "AND cp.cost IS NULL"
+    # AC/DC classification matches official TeslaMate Grafana:
+    #   NULLIF(mode(charger_phases), 0) IS NULL → DC, else AC.
+    # No charge samples → mode() is NULL → DC. Prefer attempting a SuC match
+    # for sparse data rather than dropping possible Supercharger sessions.
     sql = f"""
         SELECT
             cp.id,
@@ -57,7 +64,17 @@ def fetch_sessions(
             cp.car_id,
             g.name AS geofence_name,
             COALESCE(g.latitude, p.latitude) AS lat,
-            COALESCE(g.longitude, p.longitude) AS lon
+            COALESCE(g.longitude, p.longitude) AS lon,
+            CASE
+              WHEN NULLIF(
+                (SELECT mode() WITHIN GROUP (ORDER BY c.charger_phases)
+                 FROM charges c
+                 WHERE c.charging_process_id = cp.id),
+                0
+              ) IS NULL
+              THEN 'DC'
+              ELSE 'AC'
+            END AS charge_type
         FROM charging_processes cp
         LEFT JOIN geofences g ON g.id = cp.geofence_id
         LEFT JOIN positions p ON p.id = cp.position_id
@@ -85,6 +102,7 @@ def fetch_sessions(
                 lat=_as_float(r["lat"]),
                 lon=_as_float(r["lon"]),
                 car_id=int(r["car_id"]) if r["car_id"] is not None else None,
+                charge_type=str(r["charge_type"] or "DC"),
             )
         )
     return out
