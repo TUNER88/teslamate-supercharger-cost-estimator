@@ -7,6 +7,12 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Changed
+
+- Unmatched sessions are logged once at INFO per process (session id, geofence/place, nearest station + metres); repeats stay at DEBUG
+- Unchanged no-op loop passes collapse to a single INFO line (`No changes since last pass`) instead of re-logging Fetching/Loaded/Connecting/Candidate/Done
+- `httpx` / `httpcore` loggers are raised to WARNING so rate fetches do not spam INFO
+
 ## [0.4.0] - 2026-09-22
 
 ### Added
