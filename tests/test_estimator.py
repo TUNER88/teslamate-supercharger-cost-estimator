@@ -79,7 +79,7 @@ def test_estimate_unmatched():
 
 
 def test_cross_tou_skipped_by_default():
-    # 07:00–09:00 Europe/Berlin on a Monday → crosses 08:00 boundary
+    # 07:00\u201309:00 Europe/Berlin on a Monday \u2192 crosses 08:00 boundary
     session = ChargingSession(
         id=3,
         start_date=datetime(2026, 9, 21, 5, 0, tzinfo=ZoneInfo("UTC")),  # 07:00 CEST
@@ -317,3 +317,22 @@ def test_minute_cross_tou_allowed_uses_start_window():
     assert result.status == "ok"
     # 4h session at 30 kWh -> 7.5 kW avg -> night tier 0.17/min; 240 min * 0.17
     assert result.cost == 40.8
+
+
+def test_unmatched_includes_nearest_in_detail():
+    session = ChargingSession(
+        id=51,
+        start_date=datetime(2026, 9, 21, 10, 0, tzinfo=ZoneInfo("UTC")),
+        end_date=None,
+        charge_energy_added=10.0,
+        charge_energy_used=None,
+        cost=None,
+        geofence_id=None,
+        geofence_name="Far Away",
+        lat=48.1,
+        lon=11.5,
+    )
+    result = estimate_session(session, [_flat_station()], match_radius_m=400)
+    assert result.status == "unmatched"
+    assert "nearest:" in result.detail
+    assert "Berlin Supercharger" in result.detail
