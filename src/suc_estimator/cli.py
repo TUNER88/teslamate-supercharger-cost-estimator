@@ -7,6 +7,7 @@ import logging
 import os
 import time
 from argparse import Namespace
+from dataclasses import dataclass, field
 
 from suc_estimator import __version__
 from suc_estimator.db import connect, fetch_sessions, update_cost
@@ -15,6 +16,25 @@ from suc_estimator.pricesource import DEFAULT_URL, fetch_prices
 from suc_estimator.pricing import load_stations
 
 log = logging.getLogger("suc_estimator")
+
+
+@dataclass(frozen=True)
+class PassOutcome:
+    ok: int
+    written: int
+    unmatched: int
+    skipped: int
+    unmatched_ids: frozenset[int]
+
+
+@dataclass
+class LoopState:
+    """Process-lifetime state across hourly passes."""
+
+    logged_unmatched: set[int] = field(default_factory=set)
+    prev_outcome: PassOutcome | None = None
+    # First pass is always verbose; later passes may suppress ritual INFO lines.
+    next_verbose: bool = True
 
 
 def _env(name: str, default: str | None = None) -> str | None:
@@ -29,6 +49,14 @@ def _env_bool(name: str, default: bool = False) -> bool:
     if raw is None:
         return default
     return raw.lower() in {"1", "true", "yes"}
+
+
+def _session_place(session) -> str:
+    if session.geofence_name:
+        return session.geofence_name
+    if session.geofence_id is not None:
+        return f"geofence_id={session.geofence_id}"
+    return "unknown place"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -82,23 +110,44 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
-def run_once(args: Namespace, *, host: str, port: int, name: str, user: str, password: str) -> int:
-    log.info("Fetching public Supercharger rates from %s", args.price_url)
+def run_once(
+    args: Namespace,
+    *,
+    host: str,
+    port: int,
+    name: str,
+    user: str,
+    password: str,
+    state: LoopState | None = None,
+) -> int:
+    if state is None:
+        state = LoopState()
+
+    quiet = not state.next_verbose
+
+    def ritual(msg: str, *a) -> None:
+        if quiet:
+            log.debug(msg, *a)
+        else:
+            log.info(msg, *a)
+
+    ritual("Fetching public Supercharger rates from %s", args.price_url)
     payload = fetch_prices(url=args.price_url, cache_dir=args.cache_dir, ttl_seconds=args.cache_ttl)
     stations = load_stations(payload, family=args.pricing_family)
-    log.info("Loaded %d stations with %s tariffs", len(stations), args.pricing_family)
+    ritual("Loaded %d stations with %s tariffs", len(stations), args.pricing_family)
     if not stations:
         log.error("No priced stations loaded \u2014 aborting this pass")
         return 1
 
-    log.info("Connecting to TeslaMate DB %s@%s:%s/%s", user, host, port, name)
+    ritual("Connecting to TeslaMate DB %s@%s:%s/%s", user, host, port, name)
     with connect(host=host, port=port, dbname=name, user=user, password=password) as conn:
         sessions = fetch_sessions(
             conn, lookback_days=args.lookback_days, overwrite=args.overwrite
         )
-        log.info("Candidate sessions: %d", len(sessions))
+        ritual("Candidate sessions: %d", len(sessions))
 
         ok = unmatched = skipped = written = 0
+        unmatched_ids: set[int] = set()
         per_car: dict[int, tuple[int, float]] = {}
         coverage_gap: list[tuple[int, str]] = []
         for session in sessions:
@@ -126,7 +175,23 @@ def run_once(args: Namespace, *, host: str, port: int, name: str, user: str, pas
                     per_car[session.car_id] = (count + 1, total + (result.cost or 0.0))
             elif result.status == "unmatched":
                 unmatched += 1
-                log.debug("unmatched id=%s %s", result.session_id, result.detail)
+                unmatched_ids.add(result.session_id)
+                place = _session_place(session)
+                if result.session_id not in state.logged_unmatched:
+                    state.logged_unmatched.add(result.session_id)
+                    log.info(
+                        "unmatched id=%s place=%s %s",
+                        result.session_id,
+                        place,
+                        result.detail,
+                    )
+                else:
+                    log.debug(
+                        "unmatched id=%s place=%s %s",
+                        result.session_id,
+                        place,
+                        result.detail,
+                    )
                 if looks_like_supercharger(session):
                     geofence_name = session.geofence_name or f"id={session.geofence_id}"
                     coverage_gap.append((result.session_id, geofence_name))
@@ -137,7 +202,7 @@ def run_once(args: Namespace, *, host: str, port: int, name: str, user: str, pas
         if coverage_gap:
             names = ", ".join(dict.fromkeys(name for _, name in coverage_gap))
             log.warning(
-                "%d unmatched session(s) at a Supercharger-named geofence (%s) — "
+                "%d unmatched session(s) at a Supercharger-named geofence (%s) \u2014 "
                 "no priced station within %.0f m; missing from the feed?",
                 len(coverage_gap),
                 names,
@@ -147,16 +212,49 @@ def run_once(args: Namespace, *, host: str, port: int, name: str, user: str, pas
         if not args.dry_run:
             conn.commit()
 
-        log.info(
-            "Done: ok=%d written=%d unmatched=%d skipped=%d dry_run=%s",
-            ok,
-            written,
-            unmatched,
-            skipped,
-            args.dry_run,
+        outcome = PassOutcome(
+            ok=ok,
+            written=written,
+            unmatched=unmatched,
+            skipped=skipped,
+            unmatched_ids=frozenset(unmatched_ids),
         )
-        for car_id, (count, total) in sorted(per_car.items()):
-            log.info("car_id=%d: %d session(s), %.2f total cost", car_id, count, total)
+        prev = state.prev_outcome
+        identical_noop = (
+            prev is not None
+            and outcome.ok == 0
+            and outcome.written == 0
+            and outcome.ok == prev.ok
+            and outcome.written == prev.written
+            and outcome.unmatched == prev.unmatched
+            and outcome.skipped == prev.skipped
+            and outcome.unmatched_ids == prev.unmatched_ids
+        )
+
+        if identical_noop:
+            log.info(
+                "No changes since last pass (unmatched=%d)",
+                outcome.unmatched,
+            )
+            state.next_verbose = False
+        else:
+            # Always surface Done when the outcome changed (even if ritual was quiet).
+            log.info(
+                "Done: ok=%d written=%d unmatched=%d skipped=%d dry_run=%s",
+                ok,
+                written,
+                unmatched,
+                skipped,
+                args.dry_run,
+            )
+            for car_id, (count, total) in sorted(per_car.items()):
+                log.info("car_id=%d: %d session(s), %.2f total cost", car_id, count, total)
+
+            unmatched_changed = prev is not None and outcome.unmatched_ids != prev.unmatched_ids
+            # After a real write or unmatched-set change, make the next pass verbose once.
+            state.next_verbose = bool(outcome.written > 0 or unmatched_changed)
+
+        state.prev_outcome = outcome
     return 0
 
 
@@ -166,6 +264,9 @@ def main(argv: list[str] | None = None) -> int:
         level=logging.DEBUG if args.verbose else logging.INFO,
         format="%(asctime)s %(levelname)s %(message)s",
     )
+    # httpx/httpcore are chatty at INFO on every rates fetch; keep warnings only.
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
 
     log.info("suc-estimator %s", __version__)
 
@@ -179,15 +280,22 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     interval = max(0, int(args.update_interval_seconds))
+    state = LoopState()
     if interval <= 0:
-        return run_once(args, host=host, port=port, name=name, user=user, password=password)
+        return run_once(
+            args, host=host, port=port, name=name, user=user, password=password, state=state
+        )
 
     log.info("Loop mode: scanning every %s seconds (Ctrl+C to stop)", interval)
     while True:
         try:
-            run_once(args, host=host, port=port, name=name, user=user, password=password)
+            run_once(
+                args, host=host, port=port, name=name, user=user, password=password, state=state
+            )
         except Exception:
             log.exception("Pass failed; will retry after interval")
+            # After a failure, be verbose on the next successful pass.
+            state.next_verbose = True
         log.info("Sleeping %s seconds until next pass", interval)
         try:
             time.sleep(interval)
